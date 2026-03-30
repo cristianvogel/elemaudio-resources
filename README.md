@@ -1,6 +1,6 @@
 # elemaudio-resources
-## elemenatary-rs 
-## https://www.elementary.audio/
+## [elementary-rs](https://github.com/cristianvogel/elemaudio-rs) 
+## [elementary.audio](https://www.elementary.audio/)
 
 Sibling repo for resource ownership, resource-backed playback, and VFS mirror demos.
 
