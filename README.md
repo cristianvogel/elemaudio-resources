@@ -1,5 +1,6 @@
 # elemaudio-resources
-## [elementary-rs](https://github.com/cristianvogel/elemaudio-rs) 
+
+## [elementary-rs](https://github.com/cristianvogel/elemaudio-rs)
 ## [elementary.audio](https://www.elementary.audio/)
 
 Sibling repo for resource ownership, resource-backed playback, and VFS mirror demos.
@@ -12,9 +13,8 @@ Sibling repo for resource ownership, resource-backed playback, and VFS mirror de
 
 ## Current split state
 
-This repo currently reuses the shared resource-manager source from `elemaudio-rs` via wrapper binaries.
-That lets us split the package boundary first, then move code ownership over incrementally.
-The resource layer is an optional extension to Elementary's vendor VFS model, not a replacement for the original lookup path.
+This repo owns the optional resource layer and its demos.
+It is a separate package from `elemaudio-rs`, and it is an optional extension to Elementary's vendor VFS model, not a replacement for the original lookup path.
 
 ## Run
 
