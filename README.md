@@ -22,6 +22,8 @@ The HTTP API also exposes resource metadata by id, currently `duration_ms` and `
 
 Metadata requests are currently read-only and keyed by the derived resource id.
 
+Browser uploads confirm before overwriting an existing derived resource id.
+
 ## Run
 
 ```bash

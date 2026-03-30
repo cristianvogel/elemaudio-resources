@@ -67,8 +67,14 @@ fn main() -> io::Result<()> {
 
     for stream in listener.incoming() {
         let mut stream = stream?;
-        let request = read_request(&mut stream)?;
-        handle_request(&mut stream, &mut state, request)?;
+        match read_request(&mut stream) {
+            Ok(request) => {
+                if let Err(error) = handle_request(&mut stream, &mut state, request) {
+                    eprintln!("request failed: {error}");
+                }
+            }
+            Err(error) => eprintln!("request read failed: {error}"),
+        }
     }
 
     Ok(())
@@ -98,30 +104,30 @@ fn handle_request(
             let name = query_value(&request.query, "name")
                 .map(|value| normalize_audio_resource_name(&value))
                 .unwrap_or_default();
-            let resource = state
-                .resources
-                .get(name)
-                .cloned()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "resource not found"))?;
-            let bytes = encode_wav(&resource)?;
-            respond(stream, "200 OK", "audio/wav", &bytes)
+            match state.resources.get(name).cloned() {
+                Some(resource) => {
+                    let bytes = encode_wav(&resource)?;
+                    respond(stream, "200 OK", "audio/wav", &bytes)
+                }
+                None => respond_not_found(stream),
+            }
         }
         ("GET", "/api/resources/metadata") => {
             let name = query_value(&request.query, "name")
                 .map(|value| normalize_audio_resource_name(&value))
                 .unwrap_or_default();
-            let resource = state
-                .resources
-                .get(name)
-                .cloned()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "resource not found"))?;
-            let metadata = resource_metadata(&resource)?;
-            respond(
-                stream,
-                "200 OK",
-                "application/json",
-                &serde_json::to_vec(&metadata).unwrap(),
-            )
+            match state.resources.get(name).cloned() {
+                Some(resource) => {
+                    let metadata = resource_metadata(&resource)?;
+                    respond(
+                        stream,
+                        "200 OK",
+                        "application/json",
+                        &serde_json::to_vec(&metadata).unwrap(),
+                    )
+                }
+                None => respond_not_found(stream),
+            }
         }
         // Loads a WAV into the Rust resource manager using a filename-derived resource id.
         // Mono buffers are kept as-is; multichannel buffers remain multichannel so the browser demo can route them with `mc.sample(...)`.
