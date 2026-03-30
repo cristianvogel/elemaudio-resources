@@ -274,7 +274,7 @@ pub fn normalize_audio_resource_name(name: &str) -> String {
 }
 
 pub fn channel_resource_name(name: &str, channel: usize) -> String {
-    format!("{}:{}", normalize_audio_resource_name(name), channel + 1)
+    format!("{}_ch{}", normalize_audio_resource_name(name), channel + 1)
 }
 
 #[cfg(test)]
@@ -297,9 +297,9 @@ mod tests {
     fn builds_channel_names() {
         assert_eq!(
             channel_resource_name("myFavouriteSound.wav", 0),
-            "myFavouriteSound:1"
+            "myFavouriteSound_ch1"
         );
-        assert_eq!(channel_resource_name("folder/file.wav", 2), "file:3");
+        assert_eq!(channel_resource_name("folder/file.wav", 2), "file_ch3");
     }
 
     #[test]
