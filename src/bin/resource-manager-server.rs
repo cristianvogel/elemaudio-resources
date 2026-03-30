@@ -1,5 +1,5 @@
 use elemaudio_resources::resource::{
-    channel_resource_name, normalize_audio_resource_name, AudioBuffer, Resource, ResourceManager,
+    normalize_audio_resource_name, AudioBuffer, Resource, ResourceManager,
 };
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use std::collections::HashMap;
@@ -108,15 +108,8 @@ fn handle_request(
             state.resources.remove_matching_prefix(&base_name);
             state
                 .resources
-                .insert(base_name.clone(), Resource::audio(buffer.clone()))
+                .insert(base_name.clone(), Resource::audio(buffer))
                 .map_err(io::Error::other)?;
-            for (channel_index, channel_buffer) in buffer.split_channels().into_iter().enumerate() {
-                let channel_name = channel_resource_name(&name, channel_index);
-                state
-                    .resources
-                    .insert(channel_name, Resource::audio(channel_buffer))
-                    .map_err(io::Error::other)?;
-            }
             respond_text(stream, "ok")
         }
         ("POST", "/api/resources/play") => {

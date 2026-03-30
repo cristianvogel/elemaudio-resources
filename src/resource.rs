@@ -213,10 +213,10 @@ impl ResourceManager {
         prefix: impl AsRef<str>,
     ) -> Vec<(ResourceId, Resource)> {
         let prefix = prefix.as_ref().to_string();
-        let prefix_with_colon = format!("{prefix}:");
+        let prefix_with_channels = format!("{prefix}_ch");
         let mut removed = Vec::new();
         self.resources.retain(|id, resource| {
-            if id.as_str() == prefix || id.as_str().starts_with(&prefix_with_colon) {
+            if id.as_str() == prefix || id.as_str().starts_with(&prefix_with_channels) {
                 removed.push((id.clone(), resource.clone()));
                 false
             } else {
