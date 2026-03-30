@@ -14,6 +14,7 @@ Sibling repo for resource ownership, resource-backed playback, and VFS mirror de
 
 This repo currently reuses the shared resource-manager source from `elemaudio-rs` via wrapper binaries.
 That lets us split the package boundary first, then move code ownership over incrementally.
+The resource layer is an optional extension to Elementary's vendor VFS model, not a replacement for the original lookup path.
 
 ## Run
 

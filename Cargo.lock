@@ -258,20 +258,7 @@ name = "elemaudio-resources"
 version = "0.1.0"
 dependencies = [
  "cpal",
- "elemaudio-rs",
  "hound",
- "rkyv",
- "serde",
- "serde_json",
- "symphonia",
-]
-
-[[package]]
-name = "elemaudio-rs"
-version = "0.1.0"
-dependencies = [
- "cc",
- "cpal",
  "rkyv",
  "serde",
  "serde_json",
