@@ -1,4 +1,7 @@
-# elemaudio-resources
+
+
+<img src="https://github.com/cristianvogel/elemaudio-resources/blob/main/src/resource-server-demo.jpg" width="400" />
+
 
 ## [elementary-rs](https://github.com/cristianvogel/elemaudio-rs)
 ## [elementary.audio](https://www.elementary.audio/)
