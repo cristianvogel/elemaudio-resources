@@ -100,6 +100,8 @@ fn handle_request(
             let bytes = encode_wav(&resource)?;
             respond(stream, "200 OK", "audio/wav", &bytes)
         }
+        // Loads a WAV into the Rust resource manager using a filename-derived resource id.
+        // Mono buffers are kept as-is; multichannel buffers remain multichannel so the browser demo can route them with `mc.sample(...)`.
         ("POST", "/api/resources/load") => {
             let name =
                 query_value(&request.query, "name").unwrap_or_else(|| "resource".to_string());

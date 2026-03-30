@@ -16,6 +16,8 @@ Sibling repo for resource ownership, resource-backed playback, and VFS mirror de
 This repo owns the optional resource layer and its demos.
 It is a separate package from `elemaudio-rs`, and it is an optional extension to Elementary's vendor VFS model, not a replacement for the original lookup path.
 
+Resource ids are derived from the source filename, mono inputs stay mono, and multichannel inputs remain multichannel so the browser demo can use `el.sample(...)` or `el.mc.sample(...)` as appropriate.
+
 ## Run
 
 ```bash

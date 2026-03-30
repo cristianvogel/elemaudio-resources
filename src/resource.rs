@@ -80,6 +80,7 @@ impl AudioBuffer {
         )
     }
 
+    /// Splits the buffer into mono channel buffers.
     pub fn split_channels(&self) -> Vec<Self> {
         (0..self.channels as usize)
             .filter_map(|channel| {
@@ -259,6 +260,7 @@ impl ResourceManager {
     }
 }
 
+/// Derives a stable resource id from a source filename.
 pub fn normalize_audio_resource_name(name: &str) -> String {
     let stem = Path::new(name)
         .file_stem()
@@ -273,6 +275,7 @@ pub fn normalize_audio_resource_name(name: &str) -> String {
     }
 }
 
+/// Derives a channel-specific resource id using the `_chN` convention.
 pub fn channel_resource_name(name: &str, channel: usize) -> String {
     format!("{}_ch{}", normalize_audio_resource_name(name), channel + 1)
 }
