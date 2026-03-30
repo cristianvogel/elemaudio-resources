@@ -31,6 +31,10 @@ pub struct AudioBuffer {
 }
 
 impl AudioBuffer {
+    /// Creates a decoded audio buffer with an explicit channel count.
+    ///
+    /// Use `mono` for single-channel buffers and `split_channels` when a multi-channel
+    /// buffer should be broken into independent mono buffers.
     pub fn new(
         samples: impl Into<Arc<[f32]>>,
         sample_rate: u32,
@@ -52,14 +56,17 @@ impl AudioBuffer {
         })
     }
 
+    /// Creates a single-channel buffer.
     pub fn mono(samples: impl Into<Arc<[f32]>>, sample_rate: u32) -> Self {
         Self::new(samples, sample_rate, 1).expect("mono buffer must be valid")
     }
 
+    /// Returns the number of frames in the buffer.
     pub fn frames(&self) -> usize {
         self.samples.len() / self.channels as usize
     }
 
+    /// Returns one channel as an interleaved-to-mono sample list.
     pub fn channel_samples(&self, channel: usize) -> Option<Vec<f32>> {
         let channels = self.channels as usize;
         if channel >= channels {
@@ -169,6 +176,7 @@ impl ResourceManager {
         Self::default()
     }
 
+    /// Returns a cloned snapshot of all resources.
     pub fn snapshot(&self) -> Vec<(ResourceId, Resource)> {
         self.resources
             .iter()
@@ -176,6 +184,7 @@ impl ResourceManager {
             .collect()
     }
 
+    /// Looks up a resource by id.
     pub fn get(&self, id: impl AsRef<str>) -> Option<&Resource> {
         self.resources.get(&ResourceId::new(id.as_ref()))
     }
@@ -184,6 +193,7 @@ impl ResourceManager {
         self.get(id).cloned()
     }
 
+    /// Inserts or replaces a resource by id.
     pub fn insert(
         &mut self,
         id: impl AsRef<str>,
@@ -193,6 +203,7 @@ impl ResourceManager {
         Ok(self.resources.insert(id, resource))
     }
 
+    /// Adds a resource if the id is unused.
     pub fn add(&mut self, id: impl AsRef<str>, resource: Resource) -> Result<(), String> {
         let id = ResourceId::new(id.as_ref());
         if self.resources.contains_key(&id) {
@@ -202,6 +213,7 @@ impl ResourceManager {
         Ok(())
     }
 
+    /// Removes a resource by id.
     pub fn remove(&mut self, id: impl AsRef<str>) -> Result<Resource, String> {
         let id = ResourceId::new(id.as_ref());
         self.resources
@@ -209,6 +221,7 @@ impl ResourceManager {
             .ok_or_else(|| format!("resource not found: {}", id.as_str()))
     }
 
+    /// Removes a resource and any `_chN` channel companions that share its filename stem.
     pub fn remove_matching_prefix(
         &mut self,
         prefix: impl AsRef<str>,
@@ -227,6 +240,7 @@ impl ResourceManager {
         removed
     }
 
+    /// Renames a resource id.
     pub fn rename(&mut self, from: impl AsRef<str>, to: impl AsRef<str>) -> Result<(), String> {
         let from = ResourceId::new(from.as_ref());
         let to = ResourceId::new(to.as_ref());
@@ -241,6 +255,7 @@ impl ResourceManager {
         Ok(())
     }
 
+    /// Removes every resource except the ids listed in `keep`.
     pub fn prune_except<I, S>(&mut self, keep: I) -> Vec<(ResourceId, Resource)>
     where
         I: IntoIterator<Item = S>,

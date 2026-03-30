@@ -35,6 +35,12 @@ struct ResourceSnapshot {
     resources: Vec<ResourceEntry>,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ResourceMetadata {
+    duration_ms: f64,
+    channels: u16,
+}
+
 #[derive(Default)]
 struct PlaybackState {
     active: Option<String>,
@@ -99,6 +105,23 @@ fn handle_request(
                 .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "resource not found"))?;
             let bytes = encode_wav(&resource)?;
             respond(stream, "200 OK", "audio/wav", &bytes)
+        }
+        ("GET", "/api/resources/metadata") => {
+            let name = query_value(&request.query, "name")
+                .map(|value| normalize_audio_resource_name(&value))
+                .unwrap_or_default();
+            let resource = state
+                .resources
+                .get(name)
+                .cloned()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "resource not found"))?;
+            let metadata = resource_metadata(&resource)?;
+            respond(
+                stream,
+                "200 OK",
+                "application/json",
+                &serde_json::to_vec(&metadata).unwrap(),
+            )
         }
         // Loads a WAV into the Rust resource manager using a filename-derived resource id.
         // Mono buffers are kept as-is; multichannel buffers remain multichannel so the browser demo can route them with `mc.sample(...)`.
@@ -230,6 +253,31 @@ fn resource_bytes(resource: &Resource) -> usize {
         Resource::Text(data) => data.len(),
         Resource::Any(_) => 0,
     }
+}
+
+fn resource_metadata(resource: &Resource) -> io::Result<ResourceMetadata> {
+    let buffer = match resource {
+        Resource::Audio(buffer) => buffer,
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "resource is not audio",
+            ));
+        }
+    };
+
+    let frames = buffer.frames() as f64;
+    let sample_rate = buffer.sample_rate as f64;
+    let duration_ms = if sample_rate > 0.0 {
+        (frames / sample_rate) * 1000.0
+    } else {
+        0.0
+    };
+
+    Ok(ResourceMetadata {
+        duration_ms,
+        channels: buffer.channels,
+    })
 }
 
 fn decode_wav(bytes: &[u8]) -> io::Result<AudioBuffer> {

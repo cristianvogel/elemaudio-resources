@@ -18,6 +18,10 @@ It is a separate package from `elemaudio-rs`, and it is an optional extension to
 
 Resource ids are derived from the source filename, mono inputs stay mono, and multichannel inputs remain multichannel so the browser demo can use `el.sample(...)` or `el.mc.sample(...)` as appropriate.
 
+The HTTP API also exposes resource metadata by id, currently `duration_ms` and `channels`, so demos can show buffer stats without downloading the audio again.
+
+Metadata requests are currently read-only and keyed by the derived resource id.
+
 ## Run
 
 ```bash
