@@ -1,6 +1,7 @@
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
+use std::path::Path;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -30,16 +31,62 @@ pub struct AudioBuffer {
 }
 
 impl AudioBuffer {
-    pub fn mono(samples: impl Into<Arc<[f32]>>, sample_rate: u32) -> Self {
-        Self {
-            samples: samples.into(),
-            sample_rate,
-            channels: 1,
+    pub fn new(
+        samples: impl Into<Arc<[f32]>>,
+        sample_rate: u32,
+        channels: u16,
+    ) -> Result<Self, String> {
+        if channels == 0 {
+            return Err("audio buffer must have at least one channel".to_string());
         }
+
+        let samples = samples.into();
+        if samples.len() % channels as usize != 0 {
+            return Err("audio samples must align with the channel count".to_string());
+        }
+
+        Ok(Self {
+            samples,
+            sample_rate,
+            channels,
+        })
+    }
+
+    pub fn mono(samples: impl Into<Arc<[f32]>>, sample_rate: u32) -> Self {
+        Self::new(samples, sample_rate, 1).expect("mono buffer must be valid")
     }
 
     pub fn frames(&self) -> usize {
         self.samples.len() / self.channels as usize
+    }
+
+    pub fn channel_samples(&self, channel: usize) -> Option<Vec<f32>> {
+        let channels = self.channels as usize;
+        if channel >= channels {
+            return None;
+        }
+
+        if channels == 1 {
+            return Some(self.samples.as_ref().to_vec());
+        }
+
+        Some(
+            self.samples
+                .iter()
+                .skip(channel)
+                .step_by(channels)
+                .copied()
+                .collect(),
+        )
+    }
+
+    pub fn split_channels(&self) -> Vec<Self> {
+        (0..self.channels as usize)
+            .filter_map(|channel| {
+                self.channel_samples(channel)
+                    .map(|samples| Self::mono(samples, self.sample_rate))
+            })
+            .collect()
     }
 }
 
@@ -161,6 +208,24 @@ impl ResourceManager {
             .ok_or_else(|| format!("resource not found: {}", id.as_str()))
     }
 
+    pub fn remove_matching_prefix(
+        &mut self,
+        prefix: impl AsRef<str>,
+    ) -> Vec<(ResourceId, Resource)> {
+        let prefix = prefix.as_ref().to_string();
+        let prefix_with_colon = format!("{prefix}:");
+        let mut removed = Vec::new();
+        self.resources.retain(|id, resource| {
+            if id.as_str() == prefix || id.as_str().starts_with(&prefix_with_colon) {
+                removed.push((id.clone(), resource.clone()));
+                false
+            } else {
+                true
+            }
+        });
+        removed
+    }
+
     pub fn rename(&mut self, from: impl AsRef<str>, to: impl AsRef<str>) -> Result<(), String> {
         let from = ResourceId::new(from.as_ref());
         let to = ResourceId::new(to.as_ref());
@@ -191,5 +256,58 @@ impl ResourceManager {
             }
         });
         removed
+    }
+}
+
+pub fn normalize_audio_resource_name(name: &str) -> String {
+    let stem = Path::new(name)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or(name)
+        .trim();
+    let trimmed: String = stem.chars().take(16).collect();
+    if trimmed.is_empty() {
+        "resource".to_string()
+    } else {
+        trimmed
+    }
+}
+
+pub fn channel_resource_name(name: &str, channel: usize) -> String {
+    format!("{}:{}", normalize_audio_resource_name(name), channel + 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{channel_resource_name, normalize_audio_resource_name, AudioBuffer};
+
+    #[test]
+    fn trims_extensions_and_length() {
+        assert_eq!(
+            normalize_audio_resource_name("myFavouriteSound.wav"),
+            "myFavouriteSound"
+        );
+        assert_eq!(
+            normalize_audio_resource_name("abcdefghijklmnopq.mp3"),
+            "abcdefghijklmnop"
+        );
+    }
+
+    #[test]
+    fn builds_channel_names() {
+        assert_eq!(
+            channel_resource_name("myFavouriteSound.wav", 0),
+            "myFavouriteSound:1"
+        );
+        assert_eq!(channel_resource_name("folder/file.wav", 2), "file:3");
+    }
+
+    #[test]
+    fn splits_channels() {
+        let buffer = AudioBuffer::new(vec![1.0, 2.0, 3.0, 4.0], 44_100, 2).unwrap();
+        let channels = buffer.split_channels();
+        assert_eq!(channels.len(), 2);
+        assert_eq!(channels[0].samples.as_ref(), &[1.0, 3.0]);
+        assert_eq!(channels[1].samples.as_ref(), &[2.0, 4.0]);
     }
 }

@@ -1,7 +1,6 @@
-#[path = "../resource.rs"]
-mod resource;
-
-use resource::{AudioBuffer, Resource, ResourceManager};
+use elemaudio_resources::resource::{
+    channel_resource_name, normalize_audio_resource_name, AudioBuffer, Resource, ResourceManager,
+};
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read, Write};
@@ -90,7 +89,9 @@ fn handle_request(
             respond(stream, "200 OK", "application/octet-stream", body.as_ref())
         }
         ("GET", "/api/resources/export.wav") => {
-            let name = query_value(&request.query, "name").unwrap_or_default();
+            let name = query_value(&request.query, "name")
+                .map(|value| normalize_audio_resource_name(&value))
+                .unwrap_or_default();
             let resource = state
                 .resources
                 .get(name)
@@ -102,15 +103,26 @@ fn handle_request(
         ("POST", "/api/resources/load") => {
             let name =
                 query_value(&request.query, "name").unwrap_or_else(|| "resource".to_string());
-            let buffer = decode_wav_to_mono(&request.body)?;
+            let buffer = decode_wav(&request.body)?;
+            let base_name = normalize_audio_resource_name(&name);
+            state.resources.remove_matching_prefix(&base_name);
             state
                 .resources
-                .insert(name, Resource::audio(buffer))
+                .insert(base_name.clone(), Resource::audio(buffer.clone()))
                 .map_err(io::Error::other)?;
+            for (channel_index, channel_buffer) in buffer.split_channels().into_iter().enumerate() {
+                let channel_name = channel_resource_name(&name, channel_index);
+                state
+                    .resources
+                    .insert(channel_name, Resource::audio(channel_buffer))
+                    .map_err(io::Error::other)?;
+            }
             respond_text(stream, "ok")
         }
         ("POST", "/api/resources/play") => {
-            let name = query_value(&request.query, "name").unwrap_or_default();
+            let name = query_value(&request.query, "name")
+                .map(|value| normalize_audio_resource_name(&value))
+                .unwrap_or_default();
             if state
                 .resources
                 .get(name.clone())
@@ -137,7 +149,9 @@ fn handle_request(
             respond(stream, "200 OK", "application/json", &body)
         }
         ("POST", "/api/resources/delete") => {
-            let name = query_value(&request.query, "name").unwrap_or_default();
+            let name = query_value(&request.query, "name")
+                .map(|value| normalize_audio_resource_name(&value))
+                .unwrap_or_default();
             let removed = state.resources.remove(name.clone());
             if state.playback.active.as_deref() == Some(name.as_str()) {
                 state.playback.active = None;
@@ -176,7 +190,7 @@ fn handle_request(
             let keep: Vec<String> = keep
                 .split(',')
                 .filter(|s| !s.trim().is_empty())
-                .map(|s| s.trim().to_string())
+                .map(|s| normalize_audio_resource_name(s.trim()))
                 .collect();
             let pruned = state.resources.prune_except(keep.clone());
             if let Some(active) = state.playback.active.clone() {
@@ -223,7 +237,7 @@ fn resource_bytes(resource: &Resource) -> usize {
     }
 }
 
-fn decode_wav_to_mono(bytes: &[u8]) -> io::Result<AudioBuffer> {
+fn decode_wav(bytes: &[u8]) -> io::Result<AudioBuffer> {
     let mss = MediaSourceStream::new(
         Box::new(io::Cursor::new(bytes.to_vec())),
         Default::default(),
@@ -279,25 +293,18 @@ fn decode_wav_to_mono(bytes: &[u8]) -> io::Result<AudioBuffer> {
         buffer.copy_interleaved_ref(decoded);
         samples.extend_from_slice(buffer.samples());
     }
-    Ok(AudioBuffer::mono(
-        mix_down_to_mono(&samples, channels),
-        sample_rate,
-    ))
-}
-
-fn mix_down_to_mono(raw: &[f32], channels: usize) -> Vec<f32> {
-    if channels <= 1 {
-        return raw.to_vec();
-    }
-    raw.chunks(channels)
-        .map(|frame| frame.iter().copied().sum::<f32>() / channels as f32)
-        .collect()
+    AudioBuffer::new(samples, sample_rate, channels as u16)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
 fn encode_wav(resource: &Resource) -> io::Result<Vec<u8>> {
-    let (samples, sample_rate) = match resource {
-        Resource::Audio(buffer) => (buffer.samples.as_ref().to_vec(), buffer.sample_rate),
-        Resource::F32(samples) => (samples.as_ref().to_vec(), 44_100),
+    let (samples, sample_rate, channels) = match resource {
+        Resource::Audio(buffer) => (
+            buffer.samples.as_ref().to_vec(),
+            buffer.sample_rate,
+            buffer.channels,
+        ),
+        Resource::F32(samples) => (samples.as_ref().to_vec(), 44_100, 1),
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -312,10 +319,10 @@ fn encode_wav(resource: &Resource) -> io::Result<Vec<u8>> {
     bytes.extend_from_slice(b"WAVEfmt ");
     bytes.extend_from_slice(&16u32.to_le_bytes());
     bytes.extend_from_slice(&1u16.to_le_bytes());
-    bytes.extend_from_slice(&1u16.to_le_bytes());
+    bytes.extend_from_slice(&channels.to_le_bytes());
     bytes.extend_from_slice(&sample_rate.to_le_bytes());
-    bytes.extend_from_slice(&(sample_rate * 2).to_le_bytes());
-    bytes.extend_from_slice(&2u16.to_le_bytes());
+    bytes.extend_from_slice(&(sample_rate * channels as u32 * 2).to_le_bytes());
+    bytes.extend_from_slice(&(channels * 2).to_le_bytes());
     bytes.extend_from_slice(&16u16.to_le_bytes());
     bytes.extend_from_slice(b"data");
     bytes.extend_from_slice(&(data_bytes as u32).to_le_bytes());
